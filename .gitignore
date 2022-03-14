@@ -29,7 +29,7 @@ xcuserdata/
 
 # CocoaPods
 Pods/
-Podfile.lock
+# Podfile.lock
 
 # Editor save state
 .vscode/
