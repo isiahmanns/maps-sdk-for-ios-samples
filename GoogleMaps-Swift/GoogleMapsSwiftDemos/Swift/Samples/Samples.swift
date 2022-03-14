@@ -26,6 +26,7 @@ struct Section {
 enum Samples {
   static func allSamples() -> [Section] {
     let mapSamples = [
+      Sample(viewControllerClass: TransitViewController.self, title: "Transit Experiment"),
       Sample(viewControllerClass: BasicMapViewController.self, title: "Basic Map"),
       Sample(viewControllerClass: MapTypesViewController.self, title: "Map Types"),
       Sample(viewControllerClass: StyledMapViewController.self, title: "Styled Map"),
