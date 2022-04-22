@@ -26,11 +26,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     GMSServices.provideAPIKey(SDKConstants.apiKey)
 
-    let sampleListViewController = SampleListViewController()
+    // let sampleListViewController = SampleListViewController()
+    let transitViewController = TransitViewController()
     let frame = UIScreen.main.bounds
     let window = UIWindow(frame: frame)
-    let navigationController = UINavigationController(rootViewController: sampleListViewController)
-    window.rootViewController = navigationController
+    // let navigationController = UINavigationController(rootViewController: sampleListViewController)
+    // window.rootViewController = navigationController
+    window.rootViewController = transitViewController
     window.makeKeyAndVisible()
     self.window = window
 

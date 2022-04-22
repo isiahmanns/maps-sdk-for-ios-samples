@@ -16,25 +16,19 @@ final class TransitViewController: UIViewController {
         let camera = GMSCameraPosition(
             latitude: 40.670884415976886,
             longitude: -73.958119273615,
-            zoom: 14)
-        return GMSMapView(frame: .zero, camera: camera)
-    }()
+            zoom: 17)
 
-    private lazy var markerIconView: UIView = {
-        let view = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
-        view.backgroundColor = .white
-        if #available(iOS 13.0, *) {
-            view.layer.borderColor = .init(red: 0, green: 0, blue: 1, alpha: 1)
-        }
-        view.layer.borderWidth = 5
-        view.layer.cornerRadius = view.bounds.width/2
-        return view
+        let mapID = GMSMapID(identifier: SDKConstants.MapID.transit)
+
+        return GMSMapView(frame: .zero, mapID: mapID, camera: camera)
     }()
 
     private enum Places: String {
         case MedgarEversCollege = "place_id:ChIJzVCft3ZbwokRlCL7B6LA8U4"
         case TimesSquare = "place_id:ChIJmQJIxlVYwokRLgeuocVOGVU"
         case BarclaysCenter = "place_id:ChIJo3lEaa5bwokRnuZS2oWTlLk"
+        case FlatbushAvStation = "place_id:ChIJxXVHnlJbwokRfPknIQCZkSw"
+        case WakefieldStation = "place_id:ChIJM_TmzNHywokR2WYmgb0rF38"
 
         /// https://developers.google.com/maps/documentation/places/web-service/place-id#find-id
     }
@@ -43,7 +37,7 @@ final class TransitViewController: UIViewController {
         view = mapView
         mapView.accessibilityElementsHidden = true
 
-        fetchDirections(from: .MedgarEversCollege, to: .TimesSquare) { [self] result in
+        fetchDirections(from: .FlatbushAvStation, to: .WakefieldStation) { [self] result in
             switch result {
             case let .failure(error):
                 debugPrint(error)
@@ -57,11 +51,28 @@ final class TransitViewController: UIViewController {
         super.viewDidLoad()
     }
 
+    override var prefersHomeIndicatorAutoHidden: Bool {
+        return true
+    }
+
     private func fetchDirections(from: Places, to: Places, completion: @escaping ((AFResult<JSON>) -> Void)) {
+
+        /// check "cache" (use this for quick map debugging)
+        /*
+        if let path = Bundle.main.path(forResource: "MedgarEversCollegeToTimesSquare", ofType: "json"),
+           let jsonString = try? String(contentsOfFile: path) {
+
+            let jsonObject = JSON(parseJSON: jsonString)
+            completion(.success(jsonObject))
+            return
+        }
+         */
+
         struct Parameters: Encodable {
             let origin: String
             let destination: String
             let mode: String
+            let alternatives: String
             let key: String
         }
 
@@ -69,6 +80,7 @@ final class TransitViewController: UIViewController {
             origin: from.rawValue,
             destination: to.rawValue,
             mode: "transit",
+            alternatives: "true",
             key: SDKConstants.apiKey)
 
         /// begin request
@@ -96,13 +108,56 @@ final class TransitViewController: UIViewController {
 
     private func updateMap(json: JSON) {
         /// show path on map
-        let polylinePath: String = json["routes"][0]["overview_polyline"]["points"].stringValue
-        debugPrint(polylinePath)
+        let steps = json["routes"][0]["legs"][0]["steps"]
 
-        let polyline: GMSPolyline = .init(path: .init(fromEncodedPath: polylinePath))
-        polyline.strokeWidth = 5
-        polyline.strokeColor = .blue
-        polyline.map = self.mapView
+        let styles = [
+          GMSStrokeStyle.solidColor(.darkGray),
+          GMSStrokeStyle.solidColor(.clear)
+        ]
+
+        let lengths: [NSNumber] = [25, 25]
+
+        for i in 0..<steps.count {
+            /// plot polylines and markers
+            let polylinePath: String = steps[i]["polyline"]["points"].stringValue
+            let polyline = GMSPolyline(path: GMSPath(fromEncodedPath: polylinePath))
+            polyline.strokeWidth = 5
+
+            let startLocation = CLLocationCoordinate2D(
+                latitude: steps[i]["start_location"]["lat"].doubleValue,
+                longitude: steps[i]["start_location"]["lng"].doubleValue)
+
+            let endLocation = CLLocationCoordinate2D(
+                latitude: steps[i]["end_location"]["lat"].doubleValue,
+                longitude: steps[i]["end_location"]["lng"].doubleValue)
+
+            let startMarker = GMSMarker(position: startLocation)
+            let endMarker = GMSMarker(position: endLocation)
+
+            if steps[i]["travel_mode"].stringValue == "WALKING" {
+                polyline.spans = GMSStyleSpans(polyline.path!,
+                                               styles,
+                                               lengths,
+                                               .rhumb)
+
+                (startMarker.iconView, endMarker.iconView) = markerIconViewsWalking()
+                [startMarker, endMarker].forEach { $0.zIndex = Int32(0) }
+            }
+
+            if steps[i]["travel_mode"].stringValue == "TRANSIT" {
+                let lineColorHex = steps[i]["transit_details"]["line"]["color"].stringValue
+                let lineColor = UIColor(hex: lineColorHex)
+                polyline.strokeColor = lineColor
+
+                (startMarker.iconView, endMarker.iconView) = markerIconViewsTransit(color: lineColor)
+                [startMarker, endMarker].forEach { $0.zIndex = Int32(1) }
+            }
+
+            polyline.map = mapView
+            startMarker.map = mapView
+            endMarker.map = mapView
+        }
+
 
         /// update camera
         let polylineBounds = json["routes"][0]["bounds"]
@@ -117,38 +172,47 @@ final class TransitViewController: UIViewController {
             with: .init(top: 30, left: 30, bottom: 0.5*UIScreen.main.bounds.height, right: 30))
 
         mapView.animate(with: cameraUpdate)
-
-        /// fill in path legs (stops)
-        let steps = json["routes"][0]["legs"][0]["steps"]
-
-        for i in 0..<steps.count {
-
-            var marker: GMSMarker
-
-            if i == steps.count-1 {
-                /// plot the end location of this last step
-
-                let position = CLLocationCoordinate2D(
-                    latitude: steps[i]["end_location"]["lat"].doubleValue,
-                    longitude: steps[i]["end_location"]["lng"].doubleValue)
-
-                marker = GMSMarker(position: position)
-                print(position)
-
-            } else {
-                /// plot the start location of the current step
-
-                let position = CLLocationCoordinate2D(
-                    latitude: steps[i]["start_location"]["lat"].doubleValue,
-                    longitude: steps[i]["start_location"]["lng"].doubleValue)
-
-                marker = GMSMarker(position: position)
-                print(position)
-            }
-
-            marker.iconView = markerIconView
-            marker.map = mapView
-        }
     }
 }
 
+private func markerIconViewsTransit(color: UIColor) -> (UIView, UIView) {
+    let view = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
+    view.backgroundColor = .white
+    view.layer.borderColor = color.cgColor
+    view.layer.borderWidth = 5
+    view.layer.cornerRadius = view.bounds.width / 2
+
+    return (view, view)
+}
+
+private func markerIconViewsWalking() -> (UIView, UIView) {
+    let startView = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
+    startView.backgroundColor = .white
+    startView.layer.borderColor = UIColor.darkGray.cgColor
+    startView.layer.borderWidth = 5
+    startView.layer.cornerRadius = startView.bounds.width / 2
+
+    let endView = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
+    endView.backgroundColor = UIColor.darkGray
+    endView.layer.cornerRadius = endView.bounds.width / 2
+
+    return (startView, endView)
+}
+
+extension UIColor {
+    convenience init(hex: String, alpha: CGFloat = 1) {
+        assert(hex[hex.startIndex] == "#", "Expected hex string of format #RRGGBB")
+
+        let scanner = Scanner(string: hex)
+        scanner.scanLocation = 1  // skip #
+
+        var rgb: UInt32 = 0
+        scanner.scanHexInt32(&rgb)
+
+        self.init(
+            red:   CGFloat((rgb & 0xFF0000) >> 16)/255.0,
+            green: CGFloat((rgb &   0xFF00) >>  8)/255.0,
+            blue:  CGFloat((rgb &     0xFF)      )/255.0,
+            alpha: alpha)
+    }
+}
