@@ -201,18 +201,26 @@ private func markerIconViewsWalking() -> (UIView, UIView) {
 
 extension UIColor {
     convenience init(hex: String, alpha: CGFloat = 1) {
-        assert(hex[hex.startIndex] == "#", "Expected hex string of format #RRGGBB")
+        assert(hex.count == 7)
+        assert(hex.hasPrefix("#"))
+        let clippedHexString = hex.suffix(6)
 
-        let scanner = Scanner(string: hex)
-        scanner.scanLocation = 1  // skip #
+        let hexColors: [Int] = stride(from: 0, to: clippedHexString.count, by: 2)
+            .map { index in
+                let lowerBound = String.Index(utf16Offset: index, in: clippedHexString)
+                let upperBound = String.Index(utf16Offset: index + 2, in: clippedHexString)
+                return clippedHexString[lowerBound..<upperBound]
+            }
+            .map { hexSubstring in
+                guard let hexInt = Int(hexSubstring, radix: 16) else { fatalError() }
+                return hexInt
+            }
 
-        var rgb: UInt32 = 0
-        scanner.scanHexInt32(&rgb)
+        let maxIntensity = 255.0
+        let r = CGFloat(hexColors[0]) / maxIntensity
+        let g = CGFloat(hexColors[1]) / maxIntensity
+        let b = CGFloat(hexColors[2]) / maxIntensity
 
-        self.init(
-            red:   CGFloat((rgb & 0xFF0000) >> 16)/255.0,
-            green: CGFloat((rgb &   0xFF00) >>  8)/255.0,
-            blue:  CGFloat((rgb &     0xFF)      )/255.0,
-            alpha: alpha)
+        self.init(red: r, green: g, blue: b, alpha: alpha)
     }
 }
