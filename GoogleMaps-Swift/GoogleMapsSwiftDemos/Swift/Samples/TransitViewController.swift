@@ -23,6 +23,10 @@ final class TransitViewController: UIViewController {
         return GMSMapView(frame: .zero, mapID: mapID, camera: camera)
     }()
 
+    private lazy var markerIconViewsWalking: (UIView, UIView) = {
+        return _markerIconViewsWalking()
+    }()
+
     private enum Places: String {
         case MedgarEversCollege = "place_id:ChIJzVCft3ZbwokRlCL7B6LA8U4"
         case TimesSquare = "place_id:ChIJmQJIxlVYwokRLgeuocVOGVU"
@@ -140,7 +144,7 @@ final class TransitViewController: UIViewController {
                                                lengths,
                                                .rhumb)
 
-                (startMarker.iconView, endMarker.iconView) = markerIconViewsWalking()
+                (startMarker.iconView, endMarker.iconView) = markerIconViewsWalking
                 [startMarker, endMarker].forEach { $0.zIndex = Int32(0) }
             }
 
@@ -173,30 +177,30 @@ final class TransitViewController: UIViewController {
 
         mapView.animate(with: cameraUpdate)
     }
-}
 
-private func markerIconViewsTransit(color: UIColor) -> (UIView, UIView) {
-    let view = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
-    view.backgroundColor = .white
-    view.layer.borderColor = color.cgColor
-    view.layer.borderWidth = 5
-    view.layer.cornerRadius = view.bounds.width / 2
+    private func markerIconViewsTransit(color: UIColor) -> (UIView, UIView) {
+        let view = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
+        view.backgroundColor = .white
+        view.layer.borderColor = color.cgColor
+        view.layer.borderWidth = 5
+        view.layer.cornerRadius = view.bounds.width / 2
 
-    return (view, view)
-}
+        return (view, view)
+    }
 
-private func markerIconViewsWalking() -> (UIView, UIView) {
-    let startView = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
-    startView.backgroundColor = .white
-    startView.layer.borderColor = UIColor.darkGray.cgColor
-    startView.layer.borderWidth = 5
-    startView.layer.cornerRadius = startView.bounds.width / 2
+    private func _markerIconViewsWalking() -> (UIView, UIView) {
+        let startView = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
+        startView.backgroundColor = .white
+        startView.layer.borderColor = UIColor.darkGray.cgColor
+        startView.layer.borderWidth = 5
+        startView.layer.cornerRadius = startView.bounds.width / 2
 
-    let endView = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
-    endView.backgroundColor = UIColor.darkGray
-    endView.layer.cornerRadius = endView.bounds.width / 2
+        let endView = UIView.init(frame: .init(x: 0, y: 0, width: 20, height: 20))
+        endView.backgroundColor = UIColor.darkGray
+        endView.layer.cornerRadius = endView.bounds.width / 2
 
-    return (startView, endView)
+        return (startView, endView)
+    }
 }
 
 extension UIColor {
